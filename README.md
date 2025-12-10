@@ -43,7 +43,7 @@ go mod tidy
 ## Running the Server
 
 ```bash
-go run ./cmd/server
+go run main.go
 ```
 
 The API will be available at: **`http://localhost:8080`**
@@ -69,10 +69,10 @@ go test ./... -cover
 
 ## API Endpoints
 
-All endpoints are prefixed with `/api`.
+All endpoints are prefixed with `/tasks`.
 
 ### 1. Create Task
-**POST** `/api/tasks`
+**POST** `/tasks`
 
 **Request Body:**
 ```json
@@ -113,7 +113,7 @@ All endpoints are prefixed with `/api`.
 ---
 
 ### 2. Get Task by ID
-**GET** `/api/tasks/{id}`
+**GET** `/tasks/{id}`
 
 **Response (200 OK):**
 ```json
@@ -136,7 +136,7 @@ All endpoints are prefixed with `/api`.
 ---
 
 ### 3. Update Task
-**PUT** `/api/tasks/{id}`
+**PUT** `/tasks/{id}`
 
 **Request Body (all fields optional for partial update):**
 ```json
@@ -155,7 +155,7 @@ All endpoints are prefixed with `/api`.
 ---
 
 ### 4. Delete Task
-**DELETE** `/api/tasks/{id}`
+**DELETE** `/tasks/{id}`
 
 **Response (204 No Content):** Empty response body
 
@@ -164,7 +164,7 @@ All endpoints are prefixed with `/api`.
 ---
 
 ### 5. List All Tasks
-**GET** `/api/tasks`
+**GET** `/tasks`
 
 **Query Parameters:**
 - `status` (optional): Filter by status (`PENDING`, `IN_PROGRESS`, `DONE`)
@@ -173,10 +173,10 @@ All endpoints are prefixed with `/api`.
 
 **Examples:**
 ```
-GET /api/tasks
-GET /api/tasks?status=PENDING
-GET /api/tasks?page=2&page_size=20
-GET /api/tasks?status=IN_PROGRESS&page=1&page_size=5
+GET /tasks
+GET /tasks?status=PENDING
+GET /tasks?page=2&page_size=20
+GET /tasks?status=IN_PROGRESS&page=1&page_size=5
 ```
 
 **Response (200 OK):**

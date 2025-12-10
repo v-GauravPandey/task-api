@@ -3,164 +3,115 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/gauravpandey771/task-api/internal/domain"
-	"github.com/gauravpandey771/task-api/internal/repository"
-	httphandler "github.com/gauravpandey771/task-api/internal/transport/http"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// Helper to create a test server
-func newTestApp() *httptest.Server {
-	repo := repository.NewInMemoryTaskRepository()
-	svc := domain.NewTaskService(repo)
-	handler := httphandler.NewTaskHandler(svc)
-	app := httphandler.NewApp(handler)
-	return httptest.NewServer(app)
-}
-
-// TestCreateAndGetTask tests end-to-end task creation and retrieval
-func TestCreateAndGetTask(t *testing.T) {
-	server := newTestApp()
-	defer server.Close()
-
+// TestIntegration_CreateAndGetTask tests end-to-end task creation and retrieval
+func TestIntegration_CreateAndGetTask(t *testing.T) {
+	app := newFiberTestApp()
 	due := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
-	body := map[string]any{
-		"title":       "Integration Task",
-		"description": "Test description",
-		"due_date":    due,
-	}
+	body := map[string]any{"title": "Integration Task", "description": "Test description", "due_date": due}
 	b, _ := json.Marshal(body)
-
-	// Create task
-	resp, err := http.Post(server.URL+"/api/tasks", "application/json", bytes.NewReader(b))
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
+	req, _ := http.NewRequest(http.MethodPost, "/tasks", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, 5000)
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
+	respBody, _ := io.ReadAll(resp.Body)
 	var created map[string]any
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
-
+	require.NoError(t, json.Unmarshal(respBody, &created))
 	id, ok := created["id"].(string)
 	require.True(t, ok)
 	require.NotEmpty(t, id)
 
-	// Get task
-	getResp, err := http.Get(server.URL + "/api/tasks/" + id)
-	require.NoError(t, err)
-	defer getResp.Body.Close()
-
+	getReq, _ := http.NewRequest(http.MethodGet, "/tasks/"+id, nil)
+	getResp, _ := app.Test(getReq, 5000)
 	assert.Equal(t, http.StatusOK, getResp.StatusCode)
+	getRespBody, _ := io.ReadAll(getResp.Body)
 	var got map[string]any
-	require.NoError(t, json.NewDecoder(getResp.Body).Decode(&got))
+	require.NoError(t, json.Unmarshal(getRespBody, &got))
 	assert.Equal(t, "Integration Task", got["title"])
 }
 
-// TestListTasks tests listing all tasks
-func TestListTasks(t *testing.T) {
-	server := newTestApp()
-	defer server.Close()
-
-	// Create two tasks
+// TestIntegration_ListTasks tests listing all tasks
+func TestIntegration_ListTasks(t *testing.T) {
+	app := newFiberTestApp()
 	due := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
-	body := map[string]any{
-		"title":    "Task 1",
-		"due_date": due,
-	}
+
+	body := map[string]any{"title": "Task 1", "due_date": due}
 	b, _ := json.Marshal(body)
-	http.Post(server.URL+"/api/tasks", "application/json", bytes.NewReader(b))
+	req, _ := http.NewRequest(http.MethodPost, "/tasks", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	app.Test(req, 5000)
 
 	body["title"] = "Task 2"
 	b, _ = json.Marshal(body)
-	http.Post(server.URL+"/api/tasks", "application/json", bytes.NewReader(b))
+	req2, _ := http.NewRequest(http.MethodPost, "/tasks", bytes.NewReader(b))
+	req2.Header.Set("Content-Type", "application/json")
+	app.Test(req2, 5000)
 
-	// List tasks
-	resp, err := http.Get(server.URL + "/api/tasks")
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
+	listReq, _ := http.NewRequest(http.MethodGet, "/tasks", nil)
+	resp, _ := app.Test(listReq, 5000)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
+	respBody, _ := io.ReadAll(resp.Body)
 	var tasks []map[string]any
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&tasks))
+	require.NoError(t, json.Unmarshal(respBody, &tasks))
 	assert.Equal(t, 2, len(tasks))
 }
 
-// TestUpdateTask tests task update
-func TestUpdateTask(t *testing.T) {
-	server := newTestApp()
-	defer server.Close()
-
-	// Create task
+// TestIntegration_UpdateTask tests task update
+func TestIntegration_UpdateTask(t *testing.T) {
+	app := newFiberTestApp()
 	due := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
-	body := map[string]any{
-		"title":    "Original",
-		"due_date": due,
-	}
+	body := map[string]any{"title": "Original", "due_date": due}
 	b, _ := json.Marshal(body)
-
-	resp, _ := http.Post(server.URL+"/api/tasks", "application/json", bytes.NewReader(b))
-	var created map[string]any
-	json.NewDecoder(resp.Body).Decode(&created)
-	id := created["id"].(string)
-	resp.Body.Close()
-
-	// Update task
-	updateBody := map[string]any{
-		"title":  "Updated",
-		"status": "IN_PROGRESS",
-	}
-	updateB, _ := json.Marshal(updateBody)
-
-	req, _ := http.NewRequest(http.MethodPut, server.URL+"/api/tasks/"+id, bytes.NewReader(updateB))
+	req, _ := http.NewRequest(http.MethodPost, "/tasks", bytes.NewReader(b))
 	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{}
-	updateResp, _ := client.Do(req)
-	defer updateResp.Body.Close()
+	resp, _ := app.Test(req, 5000)
+	respBody, _ := io.ReadAll(resp.Body)
+	var created map[string]any
+	json.Unmarshal(respBody, &created)
+	id := created["id"].(string)
 
+	updateBody := map[string]any{"title": "Updated", "status": "IN_PROGRESS"}
+	updateB, _ := json.Marshal(updateBody)
+	updateReq, _ := http.NewRequest(http.MethodPut, "/tasks/"+id, bytes.NewReader(updateB))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp, _ := app.Test(updateReq, 5000)
 	assert.Equal(t, http.StatusOK, updateResp.StatusCode)
 
+	updateRespBody, _ := io.ReadAll(updateResp.Body)
 	var updated map[string]any
-	json.NewDecoder(updateResp.Body).Decode(&updated)
+	json.Unmarshal(updateRespBody, &updated)
 	assert.Equal(t, "Updated", updated["title"])
 	assert.Equal(t, "IN_PROGRESS", updated["status"])
 }
 
-// TestDeleteTask tests task deletion
-func TestDeleteTask(t *testing.T) {
-	server := newTestApp()
-	defer server.Close()
-
-	// Create task
+// TestIntegration_DeleteTask tests task deletion
+func TestIntegration_DeleteTask(t *testing.T) {
+	app := newFiberTestApp()
 	due := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
-	body := map[string]any{
-		"title":    "To Delete",
-		"due_date": due,
-	}
+	body := map[string]any{"title": "To Delete", "due_date": due}
 	b, _ := json.Marshal(body)
-
-	resp, _ := http.Post(server.URL+"/api/tasks", "application/json", bytes.NewReader(b))
+	req, _ := http.NewRequest(http.MethodPost, "/tasks", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, 5000)
+	respBody, _ := io.ReadAll(resp.Body)
 	var created map[string]any
-	json.NewDecoder(resp.Body).Decode(&created)
+	json.Unmarshal(respBody, &created)
 	id := created["id"].(string)
-	resp.Body.Close()
 
-	// Delete task
-	req, _ := http.NewRequest(http.MethodDelete, server.URL+"/api/tasks/"+id, nil)
-	client := &http.Client{}
-	deleteResp, _ := client.Do(req)
-	defer deleteResp.Body.Close()
+	delReq, _ := http.NewRequest(http.MethodDelete, "/tasks/"+id, nil)
+	delResp, _ := app.Test(delReq, 5000)
+	assert.Equal(t, http.StatusNoContent, delResp.StatusCode)
 
-	assert.Equal(t, http.StatusNoContent, deleteResp.StatusCode)
-
-	// Verify deletion
-	getResp, _ := http.Get(server.URL + "/api/tasks/" + id)
-	defer getResp.Body.Close()
+	getReq, _ := http.NewRequest(http.MethodGet, "/tasks/"+id, nil)
+	getResp, _ := app.Test(getReq, 5000)
 	assert.Equal(t, http.StatusNotFound, getResp.StatusCode)
 }

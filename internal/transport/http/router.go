@@ -19,9 +19,8 @@ func NewApp(handler *TaskHandler) *fiber.App {
 		},
 	})
 
-	// Register API routes
-	api := app.Group("/api")
-	handler.RegisterRoutes(api)
+	// Register API routes directly (routes use /tasks path)
+	handler.RegisterRoutes(app)
 
 	return app
 }
